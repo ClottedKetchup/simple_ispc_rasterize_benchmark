@@ -1487,9 +1487,20 @@ static inline key_varying Float2 NDC_to_screen(
 	const key_varying int width,
 	const key_varying int height)
 {
-	key_varying float screen_x = floor((x * 0.5f + 0.5f) * (key_varying float)width);
-	key_varying float screen_y = floor((0.5f - y * 0.5f) * (key_varying float)height);
+	key_varying float screen_x = (x * 0.5f + 0.5f) * ((key_varying float)width);
+	key_varying float screen_y = (0.5f - y * 0.5f) * ((key_varying float)height);
 	return make_Float2(screen_x, screen_y);
+}
+
+static inline key_varying Float2 screen_to_NDC(
+	const key_varying float screen_x,
+	const key_varying float screen_y,
+	const key_varying int width,
+	const key_varying int height) 
+{
+	key_varying float x = (screen_x / ((key_varying float)width) - 0.5f) * 2.0f;
+	key_varying float y = (0.5f - screen_y / ((key_varying float)height)) * 2.0f;
+	return make_Float2(x, y);
 }
 
 static inline key_varying bool point_inside_triangle(
@@ -1513,9 +1524,20 @@ static inline key_uniform Float2 NDC_to_screen(
 	const key_uniform int width,
 	const key_uniform int height)
 {
-	key_uniform float screen_x = floor((x * 0.5f + 0.5f) * (key_uniform float)width);
-	key_uniform float screen_y = floor((0.5f - y * 0.5f) * (key_uniform float)height);
+	key_uniform float screen_x = (x * 0.5f + 0.5f) * ((key_uniform float)width);
+	key_uniform float screen_y = (0.5f - y * 0.5f) * ((key_uniform float)height);
 	return make_Float2(screen_x, screen_y);
+}
+
+static inline key_uniform Float2 screen_to_NDC(
+	const key_uniform float screen_x,
+	const key_uniform float screen_y,
+	const key_uniform int width,
+	const key_uniform int height)
+{
+	key_uniform float x = (screen_x / ((key_uniform float)width) - 0.5f) * 2.0f;
+	key_uniform float y = (0.5f - screen_y / ((key_uniform float)height)) * 2.0f;
+	return make_Float2(x, y);
 }
 
 static inline key_uniform bool point_inside_triangle(

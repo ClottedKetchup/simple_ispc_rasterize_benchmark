@@ -90,8 +90,8 @@ void simple_triangle_test()
 	constexpr float triangle_z = 2.f;
 	Mesh test_mesh;
 	test_mesh.vertex_positions.push_back(make_Float3(-1.0f, 0.0f, triangle_z));
-	test_mesh.vertex_positions.push_back(make_Float3(1.0f, 0.0f, triangle_z));
-	test_mesh.vertex_positions.push_back(make_Float3(0.0f, 1.0f, triangle_z));
+	test_mesh.vertex_positions.push_back(make_Float3(1.0f, 0.0f, triangle_z + 6.0f));
+	test_mesh.vertex_positions.push_back(make_Float3(0.0f, 1.0f, triangle_z + 4.0f));
 
 	test_mesh.triangles.push_back(Triangle{ 0, 1, 2 });
 
