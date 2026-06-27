@@ -22,56 +22,7 @@ void simple_hello_world_test()
 	ispc::ispc_test_image((ispc::Float3*)(image.data()), width, height, tile_width, tile_height);
 
 	image_convert_f32_to_byte((float*)image.data(), width, height, channels, png_out.data());
-	write_png("D:\\Source_repo\\test_tmp\\ispc_raster\\write_color_out.png", width, height, channels, false, png_out.data());
-
-	ispc::ispc_test_image_operation((ispc::Float3*)(image.data()), width, height, tile_width, tile_height);
-
-	image_convert_f32_to_byte((float*)image.data(), width, height, channels, png_out.data());
-	write_png("D:\\Source_repo\\test_tmp\\ispc_raster\\blend_color_out.png", width, height, channels, false, png_out.data());
-}
-
-int get_total_bounding_pixel_count(const Mesh& mesh, const int width, const int height, const Matrix4x4& world_to_NDC)
-{
-	int total_bounding_pixel_count = 0;
-	for (const auto& triangle : mesh.triangles) 
-	{
-		const Float3 world_p0 = mesh.vertex_positions.at(triangle.index_0);
-		const Float3 world_p1 = mesh.vertex_positions.at(triangle.index_1);
-		const Float3 world_p2 = mesh.vertex_positions.at(triangle.index_2);
-
-		const Float4 p0_NDC = world_to_NDC * make_Float4(world_p0, 1.0f); 
-		const Float4 p1_NDC = world_to_NDC * make_Float4(world_p1, 1.0f);
-		const Float4 p2_NDC = world_to_NDC * make_Float4(world_p2, 1.0f);
-
-		const Float2 p0_screen = NDC_to_screen(p0_NDC.v[0] / p0_NDC.v[3], p0_NDC.v[1] / p0_NDC.v[3], width, height);
-		const float p0_z = p0_NDC.v[2] / p0_NDC.v[3];
-
-		const Float2 p1_screen = NDC_to_screen(p1_NDC.v[0] / p1_NDC.v[3], p1_NDC.v[1] / p1_NDC.v[3], width, height);
-		const float p1_z = p1_NDC.v[2] / p1_NDC.v[3];
-
-		const Float2 p2_screen = NDC_to_screen(p2_NDC.v[0] / p2_NDC.v[3], p2_NDC.v[1] / p2_NDC.v[3], width, height);
-		const float p2_z = p2_NDC.v[2] / p2_NDC.v[3];
-
-		BoundingBox2 box = make_bounding_box2_varying();
-		box = extend_bounding_box2(box, p0_screen);
-		box = extend_bounding_box2(box, p1_screen);
-		box = extend_bounding_box2(box, p2_screen);
-
-		float x_start = std::max(0.0f, box.x_min);
-		float x_end = std::min((float)width, box.x_max);
-		float y_start = std::max(0.0f, box.y_min);
-		float y_end = std::min((float)height, box.y_max);
-
-		for (int x = (int)floor(x_start); x <= (int)ceil(x_end); ++x) {
-			for (int y = (int)floor(y_start); y <= (int)ceil(y_end); ++y) {
-				if (x >= 0 && x < width && y >= 0 && y < height) {
-					++total_bounding_pixel_count;
-				}
-			}
-		}
-
-	}
-	return total_bounding_pixel_count;
+	write_png("D:\\Source_repo\\test_tmp\\ispc_raster\\ispc_hello_world.png", width, height, channels, false, png_out.data());
 }
 
 void simple_triangle_test()
@@ -82,28 +33,29 @@ void simple_triangle_test()
 	const int tile_height = 4;
 	const int channels = 3;
 
-	// init image.
-	std::vector<Float3> image(width * height, { 0 });
-	std::vector<uint8_t> png_out(width * height * channels, { 0 });
-
 	// init test mesh.
 	constexpr float triangle_z = 2.f;
-	Mesh test_mesh;
-	test_mesh.vertex_positions.push_back(make_Float3(-1.0f, 0.0f, triangle_z));
-	test_mesh.vertex_positions.push_back(make_Float3(1.0f, 0.0f, triangle_z + 6.0f));
-	test_mesh.vertex_positions.push_back(make_Float3(0.0f, 1.0f, triangle_z + 4.0f));
 
-	test_mesh.triangles.push_back(Triangle{ 0, 1, 2 });
+	std::vector<Float3> mesh_vertex_positions;
+	mesh_vertex_positions.push_back(make_Float3(-1.0f, 0.0f, triangle_z));
+	mesh_vertex_positions.push_back(make_Float3(1.0f, 0.0f, triangle_z));
+	mesh_vertex_positions.push_back(make_Float3(0.0f, 1.0f, triangle_z));
 
-	test_mesh.vertex_colors.push_back(make_Float3(1.0f, 0.0f, 0.0f));
-	test_mesh.vertex_colors.push_back(make_Float3(0.0f, 1.0f, 0.0f));
-	test_mesh.vertex_colors.push_back(make_Float3(0.0f, 0.0f, 1.0f));
+	std::vector<Float3> mesh_vertex_colors;
+	mesh_vertex_colors.push_back(make_Float3(1.0f, 0.0f, 0.0f));
+	mesh_vertex_colors.push_back(make_Float3(0.0f, 1.0f, 0.0f));
+	mesh_vertex_colors.push_back(make_Float3(0.0f, 0.0f, 1.0f));
+
+	std::vector<Triangle> mesh_triangles;
+	mesh_triangles.push_back(Triangle{ 0, 1, 2 });
+
+	Model test_model;
+	test_model.add_mesh(mesh_triangles, mesh_vertex_positions, mesh_vertex_colors);
 
 	// init camera
 	Camera camera = camera_init_varying();
 	camera_look_at(camera, make_Float3(0.0f, 0.0f, triangle_z));
 	
-	// TODO: clip
 	camera.aspect = float(width) / float(height);
 	camera.fov = 40.0f;
 	camera.near = 1.0f;
@@ -116,30 +68,68 @@ void simple_triangle_test()
 	
 	const Matrix4x4 world_to_NDC = perspective * (world_to_camera * model);
 
-	const int total_bounding_pixel_count = get_total_bounding_pixel_count(test_mesh, width, height, world_to_NDC);
-	
-	std::vector<Pixel> pixel_buffer(total_bounding_pixel_count, {});
-	uint64_t raster_pixel_count = 0;
-
-	ispc::ispc_test_render_triangle((ispc::Float3*)(image.data()), 
-		width, 
+	uint32_t max_pixel_count = 0;
+	ispc::ispc_get_pixel_count(width, 
 		height, 
-		tile_width, 
-		tile_height,
 
-		test_mesh.triangles.size(),
+		test_model.triangles.size(),
+		(const ispc::Mesh*)test_model.meshes.data(), 
+		(const ispc::Triangle*)test_model.triangles.data(), 
+		(const ispc::Float3*)test_model.vertex_positions.data(),
+		(const ispc::Float3*)test_model.vertex_colors.data(),
 
-		(const ispc::Triangle*)test_mesh.triangles.data(),
-		(ispc::Float3*)test_mesh.vertex_positions.data(),
-		(ispc::Float3*)test_mesh.vertex_colors.data(),
+		(const ispc::Matrix4x4*)(&world_to_NDC),
+		&max_pixel_count);
+	
+	std::vector<Pixel> pixel_buffer(max_pixel_count, {0.0f, 0.0f, EMPTY_INDEX_32, 0.0f, 0.0f, 0.0f});
+	uint32_t pixel_count = 0;
+
+	// init image.
+	const uint64_t depth_bits_high = float_to_uint(2.0f);
+	const uint64_t depth_bits_low = EMPTY_INDEX_32;
+	const uint64_t depth_bits = (depth_bits_high << 32) | (depth_bits_low);
+	
+	std::vector<Float3> image(width * height, { 0 });
+	std::vector<uint64_t> depth_buffer(width * height, { depth_bits });
+
+	std::vector<uint8_t> png_out(width * height * channels, { 0 });
+
+	ispc::ispc_rasterize_triangle(width,
+		height,
+		depth_buffer.data(),
+
+		test_model.triangles.size(),
+		(const ispc::Mesh*)test_model.meshes.data(),
+		(const ispc::Triangle*)test_model.triangles.data(),
+		(const ispc::Float3*)test_model.vertex_positions.data(),
+		(const ispc::Float3*)test_model.vertex_colors.data(),
 
 		(const ispc::Matrix4x4*)(&world_to_NDC),
 
-		(ispc::Pixel*)pixel_buffer.data(),
-		&raster_pixel_count);
+		max_pixel_count,
+		&pixel_count,
+		(ispc::Pixel*)pixel_buffer.data());
 
+	ispc::ispc_shading_pixel(width, 
+		height, 
+		tile_width, 
+		tile_height, 
+		depth_buffer.data(), 
+		(ispc::Float3*)image.data(),
+		
+		(const ispc::Mesh*)test_model.meshes.data(),
+		(const ispc::Triangle*)test_model.triangles.data(),
+		(const ispc::Float3*)test_model.vertex_positions.data(),
+		(const ispc::Float3*)test_model.vertex_colors.data(),
+
+		(const ispc::Matrix4x4*)(&world_to_NDC),
+
+		pixel_count,
+		(const ispc::Pixel*)pixel_buffer.data());
+
+		
 	image_convert_f32_to_byte((float*)image.data(), width, height, channels, png_out.data());
-	write_png("D:\\Source_repo\\test_tmp\\ispc_raster\\test_triangle_image_2.png", width, height, channels, false, png_out.data());
+	write_png("D:\\Source_repo\\test_tmp\\ispc_raster\\test_pipeline.png", width, height, channels, false, png_out.data());
 }
 
 int main()

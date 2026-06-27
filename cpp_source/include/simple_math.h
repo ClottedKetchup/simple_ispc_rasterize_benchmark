@@ -4,6 +4,8 @@
 #define SIMPLE_MATH_PI 3.1415926535897932384626433832795
 #define SIMPLE_MATH_FMAX 3.402823466e+38F
 
+#define EMPTY_INDEX_32 0xFFFFFFFF
+
 
 #if defined (ISPC) || defined(__ISPC__)
 	#define key_uniform uniform
@@ -17,6 +19,7 @@
 
 #else
 #include <math.h>
+#include <cstdint>
 #endif
 
 
@@ -358,6 +361,12 @@ static inline key_varying Float3 normalize(const key_varying Float3& v)
 	return result;
 }
 
+static inline key_varying float length(const key_varying Float3& v)
+{
+	key_varying float len_sq = v.v[0] * v.v[0] + v.v[1] * v.v[1] + v.v[2] * v.v[2];
+	return sqrt(len_sq);
+}
+
 static inline key_varying float dot(const key_varying Float3& a, const key_varying Float3& b)
 {
 	return a.v[0] * b.v[0] + a.v[1] * b.v[1] + a.v[2] * b.v[2];
@@ -465,6 +474,12 @@ static inline key_uniform Float3 normalize(const key_uniform Float3& v)
 	return result;
 }
 
+static inline key_uniform float length(const key_uniform Float3& v)
+{
+	key_uniform float len_sq = v.v[0] * v.v[0] + v.v[1] * v.v[1] + v.v[2] * v.v[2];
+	return sqrt(len_sq);
+}
+
 static inline key_uniform float dot(const key_uniform Float3& a, const key_uniform Float3& b)
 {
 	return a.v[0] * b.v[0] + a.v[1] * b.v[1] + a.v[2] * b.v[2];
@@ -493,6 +508,10 @@ static inline key_varying float get_z(const key_varying Float4& v)
 static inline key_varying float get_w(const key_varying Float4& v)
 {
 	return v.v[3];
+}
+static inline key_varying Float2 get_xy(const key_varying Float4& v)
+{
+	return make_Float2(v.v[0], v.v[1]);
 }
 
 static inline key_varying Float4 make_Float4(
@@ -622,6 +641,10 @@ static inline key_uniform float get_z(const key_uniform Float4& v)
 static inline key_uniform float get_w(const key_uniform Float4& v)
 {
 	return v.v[3];
+}
+static inline key_uniform Float2 get_xy(const key_uniform Float4& v)
+{
+	return make_Float2(v.v[0], v.v[1]);
 }
 
 static inline key_uniform Float4 make_Float4(
@@ -1462,11 +1485,26 @@ struct Triangle
 	unsigned int index_0;
 	unsigned int index_1;
 	unsigned int index_2;
+
+	unsigned int mesh_index;
 };
 
 struct Int2 
 {
 	int x, y;
+};
+
+
+#if defined (ISPC) || defined(__ISPC__)
+#else 
+using uint32 = uint32_t;
+using uint64 = uint64_t;
+#endif
+struct Mesh 
+{
+	uint64 triangles_offset;
+	uint64 vertex_positions_offset;
+	uint64 vertex_colors_offset;
 };
 
 struct Pixel 
@@ -1554,6 +1592,94 @@ static inline key_uniform bool point_inside_triangle(
 		(cross_p0p_p0p1 <= 0.0f && cross_p1p_p1p2 <= 0.0f && cross_p2p_p0p2 <= 0.0f);
 }
 #endif
+
+#define MAX_POLYGON_VERTICES 4
+static inline void clip_triangle_near_plane(key_varying const Float4 p_src[MAX_POLYGON_VERTICES],
+	key_varying const int count_src, 
+	key_varying Float4 p_dst[MAX_POLYGON_VERTICES], 
+	key_varying int count_dst[])
+{
+	const key_varying float threshold = 1E-5f;
+
+	*count_dst = 0;
+	for (key_varying int p_index = 0; p_index < count_src; ++p_index) 
+	{
+		key_varying int p_next_index = (p_index + 1) % count_src; 
+
+		const key_varying Float4 p0 = p_src[p_index];
+		const key_varying Float4 p1 = p_src[p_next_index];
+
+		const key_varying bool p0_in_range = !(get_z(p0) < (threshold * get_w(p0)));
+		if (p0_in_range) 
+		{
+			p_dst[(*count_dst)++] = p_src[p_index];
+		}
+
+		const key_varying bool p1_in_range = !(get_z(p1) < (threshold * get_w(p1)));
+		if (p1_in_range != p0_in_range)
+		{
+			key_varying float t = (get_z(p0) - threshold * get_w(p0)) / (threshold * (get_w(p1) - get_w(p0)) - (get_z(p1) - get_z(p0)));
+			key_varying Float4 p_intersect = p0 + t * (p1 - p0);
+			p_dst[(*count_dst)++] = p_intersect;
+		}
+	}
+}
+
+#if defined (ISPC) || defined(__ISPC__)
+static inline void clip_triangle_near_plane(const key_uniform Float4 p_src[MAX_POLYGON_VERTICES],
+	const key_uniform int count_src,
+	key_uniform Float4 p_dst[MAX_POLYGON_VERTICES],
+	key_uniform int count_dst[])
+{
+	const key_uniform float threshold = 1e-5f;
+
+	*count_dst = 0;
+	for (key_uniform int p_index = 0; p_index < count_src; ++p_index)
+	{
+		key_uniform int p_next_index = (p_index + 1) % count_src;
+
+		const key_uniform Float4 p0 = p_src[p_index];
+		const key_uniform Float4 p1 = p_src[p_next_index];
+
+		const key_uniform bool p0_in_range = !(get_z(p0) < (threshold * get_w(p0)));
+		if (p0_in_range)
+		{
+			p_dst[(*count_dst)++] = p_src[p_index];
+		}
+
+		const key_uniform bool p1_in_range = !(get_z(p1) < (threshold * get_w(p1)));
+		if (p1_in_range != p0_in_range)
+		{
+			key_uniform float t = (get_z(p0) - threshold * get_w(p0)) /
+				(threshold * (get_w(p1) - get_w(p0)) - (get_z(p1) - get_z(p0)));
+			key_uniform Float4 p_intersect = p0 + t * (p1 - p0);
+			p_dst[(*count_dst)++] = p_intersect;
+		}
+	}
+}
+#endif
+
+static inline float uint_to_float(unsigned int u)
+{
+#if defined (ISPC) || defined(__ISPC__)
+	return floatbits(u);
+#else
+	float f;
+	memcpy(&f, &u, sizeof(f));
+	return f;
+#endif
+}
+
+static inline unsigned int float_to_uint(float f)
+{
+#if defined (ISPC) || defined(__ISPC__)
+	return intbits(f);
+#else
+	unsigned int u;
+	memcpy(&u, &f, sizeof(u));
+	return u;
+#endif
+}
 
 #endif // !SIMPLE_MATH_H
 
