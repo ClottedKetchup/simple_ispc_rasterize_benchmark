@@ -43,11 +43,21 @@ void simple_triangle_test()
 
 	std::vector<Float3> mesh_vertex_colors;
 	mesh_vertex_colors.push_back(make_Float3(1.0f, 0.0f, 0.0f));
-	mesh_vertex_colors.push_back(make_Float3(0.0f, 1.0f, 0.0f));
-	mesh_vertex_colors.push_back(make_Float3(0.0f, 0.0f, 1.0f));
+	mesh_vertex_colors.push_back(make_Float3(1.0f, 1.0f, 0.0f));
+	mesh_vertex_colors.push_back(make_Float3(1.0f, 0.0f, 0.0f));
 
 	std::vector<Triangle> mesh_triangles;
 	mesh_triangles.push_back(Triangle{ 0, 1, 2 });
+
+	mesh_vertex_positions.push_back(make_Float3(0.5f, 0.0f, 2.5f));
+	mesh_vertex_positions.push_back(make_Float3(2.5f, 0.0f, 2.5f));
+	mesh_vertex_positions.push_back(make_Float3(0.5f, 2.0f, 2.5f));
+
+	mesh_vertex_colors.push_back(make_Float3(0.0f, 0.0f, 1.0f));
+	mesh_vertex_colors.push_back(make_Float3(0.0f, 1.0f, 0.0f));
+	mesh_vertex_colors.push_back(make_Float3(0.0f, 0.0f, 1.0f));
+
+	mesh_triangles.push_back(Triangle{ 3, 4, 5 });
 
 	Model test_model;
 	test_model.add_mesh(mesh_triangles, mesh_vertex_positions, mesh_vertex_colors);
@@ -129,7 +139,7 @@ void simple_triangle_test()
 
 		
 	image_convert_f32_to_byte((float*)image.data(), width, height, channels, png_out.data());
-	write_png("D:\\Source_repo\\test_tmp\\ispc_raster\\test_pipeline.png", width, height, channels, false, png_out.data());
+	write_png("D:\\Source_repo\\test_tmp\\ispc_raster\\test_depth_test.png", width, height, channels, false, png_out.data());
 }
 
 int main()

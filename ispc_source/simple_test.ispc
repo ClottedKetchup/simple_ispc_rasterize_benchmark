@@ -106,6 +106,7 @@ task_get_pixel_count(const uniform int image_width,
                 dst_vertices[clipped_v1_index].v[1] / dst_vertices[clipped_v1_index].v[3]);
             const Float2 p2_NDC_2D = make_Float2(dst_vertices[clipped_v2_index].v[0] / dst_vertices[clipped_v2_index].v[3], 
                 dst_vertices[clipped_v2_index].v[1] / dst_vertices[clipped_v2_index].v[3]);
+            
             const float triangle_area = cross(p1_NDC_2D - p0_NDC_2D, p2_NDC_2D - p1_NDC_2D);
             if(!(abs(triangle_area) > 0.0f)) 
             {
@@ -129,7 +130,7 @@ task_get_pixel_count(const uniform int image_width,
             int x_count = ((key_varying int)ceil(x_end)) - ((key_varying int)floor(x_start));
             int y_count = ((key_varying int)ceil(y_end)) - ((key_varying int)floor(y_start));
 
-            atomic_add_global(pixel_counter, x_count * y_count);
+            atomic_add_global(pixel_counter, (key_varying unsigned int)(x_count * y_count));
         }
         
     }
@@ -299,7 +300,7 @@ task_rasterize_triangle(const uniform int image_width,
 
                     float b0_world = weighted_b0_NDC * inv_weight_sum;
                     float b1_world = weighted_b1_NDC * inv_weight_sum;
-                    float b2_world = weighted_b2_NDC * inv_weight_sum; 
+                    float b2_world = max(1.0f - b0_world - b1_world, 0.0f); 
 
                     float interpolated_x = dst_vertices[clipped_v0_index].v[0] * b0_world +
                                         dst_vertices[clipped_v1_index].v[0] * b1_world +
@@ -319,7 +320,7 @@ task_rasterize_triangle(const uniform int image_width,
 
                     float depth = interpolated_z / interpolated_w;
 
-                    unsigned int pixel_index = atomic_add_global(pixel_counter, 1u);
+                    unsigned int pixel_index = atomic_add_global(pixel_counter, (key_varying unsigned int)1u);
                     assert(pixel_index < max_pixel_count);
 
                     const uint64 depth_bits_high = float_to_uint(depth);
@@ -328,7 +329,7 @@ task_rasterize_triangle(const uniform int image_width,
 
                     const int image_pixel_index = y * image_width + x;
 
-                    atomic_min_global(&(depth_buffer[image_pixel_index]), depth_bits);
+                    atomic_min_global(&(depth_buffer[image_pixel_index]), (key_varying uint64)depth_bits);
 
                     Float3 interpolated_p = make_Float3(interpolated_x, interpolated_y, interpolated_z);
                     Float3 p0_homo_3 = make_Float3(p0_homo.v[0], p0_homo.v[1], p0_homo.v[2]);
@@ -340,13 +341,16 @@ task_rasterize_triangle(const uniform int image_width,
                     float original_p1p_x_p1p2 = length(cross(interpolated_p - p1_homo_3, p2_homo_3 - p1_homo_3));
                     float original_p2p_x_p0p2 = length(cross(interpolated_p - p2_homo_3, p0_homo_3 - p2_homo_3)); 
 
+                    float original_b0_world = original_p1p_x_p1p2 / original_triangle_area;
+                    float original_b1_world = original_p2p_x_p0p2 / original_triangle_area;
+                    float original_b2_world = max(1.0f - original_b0_world - original_b1_world, 0.0f);
+
                     pixel_buffer[pixel_index].screen_x = pixel_center.v[0];
                     pixel_buffer[pixel_index].screen_y = pixel_center.v[1];
                     pixel_buffer[pixel_index].triangle_index = triangle_index;
-
-                    pixel_buffer[pixel_index].b0_world = original_p1p_x_p1p2 / original_triangle_area;
-                    pixel_buffer[pixel_index].b1_world = original_p2p_x_p0p2 / original_triangle_area;
-                    pixel_buffer[pixel_index].b2_world = original_p0p_x_p0p1 / original_triangle_area;
+                    pixel_buffer[pixel_index].b0_world = original_b0_world;
+                    pixel_buffer[pixel_index].b1_world = original_b1_world;
+                    pixel_buffer[pixel_index].b2_world = original_b2_world;
                 }
             }
         }
