@@ -69,9 +69,27 @@
 //		color.v[2] = target.v[2];
 //	}
 
+#if defined (ISPC) || defined(__ISPC__)
+#else 
+using uint32 = uint32_t;
+using uint64 = uint64_t;
+using int32 = int32_t;
+using int64 = int64_t;
+#endif
+
 struct Float2
 {
 	float v[2];
+};
+
+struct Int2 
+{
+	int v[2];
+};
+
+struct Lint2 
+{
+	int64 v[2];
 };
 
 static inline key_varying float get_x(const key_varying Float2& v)
@@ -97,6 +115,28 @@ static inline key_varying Float2 make_Float2(const key_varying float f)
 	v.v[0] = f;
 	v.v[1] = f;
 	return v;
+}
+
+static inline key_varying Int2 make_Int2(const key_varying int x, const key_varying int y)
+{
+	key_varying Int2 v;
+	v.v[0] = x;
+	v.v[1] = y;
+	return v;
+}
+static inline key_varying Lint2 make_Lint2(const key_varying int64 x, const key_varying int64 y)
+{
+	key_varying Lint2 v;
+	v.v[0] = x;
+	v.v[1] = y;
+	return v;
+}
+
+static inline key_varying Int2 operator-(const key_varying Int2& a, const key_varying Int2& b) {
+	return make_Int2(a.v[0] - b.v[0], a.v[1] - b.v[1]);
+}
+static inline key_varying Lint2 operator-(const key_varying Lint2& a, const key_varying Lint2& b) {
+	return make_Lint2(a.v[0] - b.v[0], a.v[1] - b.v[1]);
 }
 
 static inline key_varying Float2 operator+(const key_varying Float2& a, const key_varying Float2& b) {
@@ -142,6 +182,16 @@ static inline key_varying float cross(const key_varying Float2& a, const key_var
 	return a.v[0] * b.v[1] - a.v[1] * b.v[0];
 }
 
+static inline key_varying int cross(const key_varying Int2& a, const key_varying Int2& b)
+{
+	return a.v[0] * b.v[1] - a.v[1] * b.v[0];
+}
+
+static inline key_varying int64 cross(const key_varying Lint2& a, const key_varying Lint2& b)
+{
+	return a.v[0] * b.v[1] - a.v[1] * b.v[0];
+}
+
 static inline key_varying Float2 normalize(const key_varying Float2& v)
 {
 	key_varying float len_sq = v.v[0] * v.v[0] + v.v[1] * v.v[1];
@@ -183,6 +233,30 @@ static inline key_uniform Float2 make_Float2(const key_uniform float f)
 	v.v[0] = f;
 	v.v[1] = f;
 	return v;
+}
+
+static inline key_uniform Int2 make_Int2(const key_uniform int x, const key_uniform int y)
+{
+	key_uniform Int2 v;
+	v.v[0] = x;
+	v.v[1] = y;
+	return v;
+}
+
+static inline key_uniform Lint2 make_Lint2(const key_uniform int64 x, const key_uniform int64 y)
+{
+	key_uniform Lint2 v;
+	v.v[0] = x;
+	v.v[1] = y;
+	return v;
+}
+
+static inline key_uniform Int2 operator-(const key_uniform Int2& a, const key_uniform Int2& b) {
+	return make_Int2(a.v[0] - b.v[0], a.v[1] - b.v[1]);
+}
+
+static inline key_uniform Lint2 operator-(const key_uniform Lint2& a, const key_uniform Lint2& b) {
+	return make_Lint2(a.v[0] - b.v[0], a.v[1] - b.v[1]);
 }
 
 static inline key_uniform Float2 operator+(const key_uniform Float2& a, const key_uniform Float2& b)
@@ -236,6 +310,16 @@ static inline key_uniform Float2 operator/(const key_uniform float s, const key_
 }
 
 static inline key_uniform float cross(const key_uniform Float2& a, const key_uniform Float2& b)
+{
+	return a.v[0] * b.v[1] - a.v[1] * b.v[0];
+}
+
+static inline key_uniform int cross(const key_uniform Int2& a, const key_uniform Int2& b)
+{
+	return a.v[0] * b.v[1] - a.v[1] * b.v[0];
+}
+
+static inline key_uniform int64 cross(const key_uniform Lint2& a, const key_uniform Lint2& b)
 {
 	return a.v[0] * b.v[1] - a.v[1] * b.v[0];
 }
@@ -1489,17 +1573,6 @@ struct Triangle
 	unsigned int mesh_index;
 };
 
-struct Int2 
-{
-	int x, y;
-};
-
-
-#if defined (ISPC) || defined(__ISPC__)
-#else 
-using uint32 = uint32_t;
-using uint64 = uint64_t;
-#endif
 struct Mesh 
 {
 	uint64 triangles_offset;
@@ -1555,6 +1628,39 @@ static inline key_varying bool point_inside_triangle(
 		(cross_p0p_p0p1 <= 0.0f && cross_p1p_p1p2 <= 0.0f && cross_p2p_p0p2 <= 0.0f);
 }
 
+// note: ccw triangle will become cw in screen space.
+static inline key_varying bool point_inside_edge(const key_varying Lint2 p_start, const key_varying Lint2 p_end, const key_varying int64 edge_function)
+{
+	if (edge_function < 0) {
+		return true;
+	}
+
+	if (edge_function > 0) {
+		return false;
+	}
+	
+	// note: top-left rule. but reverse in screen space.
+	return (p_end.v[1] < p_start.v[1]) || ((p_end.v[1] == p_start.v[1]) && (p_end.v[0] > p_start.v[0]));
+}
+static inline key_varying bool point_inside_triangle_int(
+	const key_varying Float2 screen_p,
+	const key_varying Float2 screen_p0,
+	const key_varying Float2 screen_p1,
+	const key_varying Float2 screen_p2)
+{
+	const key_varying float point_scale = 512.0f;
+	const key_varying Lint2 p = make_Lint2((key_varying int64)(screen_p.v[0] * point_scale), (key_varying int64)(screen_p.v[1] * point_scale));
+	const key_varying Lint2 p0 = make_Lint2((key_varying int64)(screen_p0.v[0] * point_scale), (key_varying int64)(screen_p0.v[1] * point_scale));
+	const key_varying Lint2 p1 = make_Lint2((key_varying int64)(screen_p1.v[0] * point_scale), (key_varying int64)(screen_p1.v[1] * point_scale));
+	const key_varying Lint2 p2 = make_Lint2((key_varying int64)(screen_p2.v[0] * point_scale), (key_varying int64)(screen_p2.v[1] * point_scale));
+
+	const key_varying int64 p0p1_x_p0p = cross(p1 - p0, p - p0);
+	const key_varying int64 p1p2_x_p1p = cross(p2 - p1, p - p1);
+	const key_varying int64 p2p0_x_p2p = cross(p0 - p2, p - p2);
+
+	return point_inside_edge(p0, p1, p0p1_x_p0p) && point_inside_edge(p1, p2, p1p2_x_p1p) && point_inside_edge(p2, p0, p2p0_x_p2p);
+}
+
 #if defined (ISPC) || defined(__ISPC__)
 static inline key_uniform Float2 NDC_to_screen(
 	const key_uniform float x,
@@ -1590,6 +1696,39 @@ static inline key_uniform bool point_inside_triangle(
 
 	return (cross_p0p_p0p1 > 0.0f && cross_p1p_p1p2 > 0.0f && cross_p2p_p0p2 > 0.0f) ||
 		(cross_p0p_p0p1 <= 0.0f && cross_p1p_p1p2 <= 0.0f && cross_p2p_p0p2 <= 0.0f);
+}
+
+// note: ccw triangle will become cw in screen space.
+static inline key_uniform bool point_inside_edge(const key_uniform Lint2 p_start, const key_uniform Lint2 p_end, const key_uniform int64 edge_function)
+{
+	if (edge_function < 0) {
+		return true;
+	}
+
+	if (edge_function > 0) {
+		return false;
+	}
+
+	// note: top-left rule. but reverse in screen space.
+	return (p_end.v[1] < p_start.v[1]) || ((p_end.v[1] == p_start.v[1]) && (p_end.v[0] > p_start.v[0]));
+}
+static inline key_uniform bool point_inside_triangle_int(
+	const key_uniform Float2 screen_p,
+	const key_uniform Float2 screen_p0,
+	const key_uniform Float2 screen_p1,
+	const key_uniform Float2 screen_p2)
+{
+	const key_uniform float point_scale = 512.0f;
+	const key_uniform Lint2 p = make_Lint2((key_uniform int64)(screen_p.v[0] * point_scale), (key_uniform int64)(screen_p.v[1] * point_scale));
+	const key_uniform Lint2 p0 = make_Lint2((key_uniform int64)(screen_p0.v[0] * point_scale), (key_uniform int64)(screen_p0.v[1] * point_scale));
+	const key_uniform Lint2 p1 = make_Lint2((key_uniform int64)(screen_p1.v[0] * point_scale), (key_uniform int64)(screen_p1.v[1] * point_scale));
+	const key_uniform Lint2 p2 = make_Lint2((key_uniform int64)(screen_p2.v[0] * point_scale), (key_uniform int64)(screen_p2.v[1] * point_scale));
+
+	const key_uniform int64 p0p1_x_p0p = cross(p1 - p0, p - p0);
+	const key_uniform int64 p1p2_x_p1p = cross(p2 - p1, p - p1);
+	const key_uniform int64 p2p0_x_p2p = cross(p0 - p2, p - p2);
+
+	return point_inside_edge(p0, p1, p0p1_x_p0p) && point_inside_edge(p1, p2, p1p2_x_p1p) && point_inside_edge(p2, p0, p2p0_x_p2p);
 }
 #endif
 

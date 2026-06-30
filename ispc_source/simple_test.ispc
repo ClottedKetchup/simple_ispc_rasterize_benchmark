@@ -273,7 +273,7 @@ task_rasterize_triangle(const uniform int image_width,
                     Float2 pixel_center = make_Float2((key_varying float)x + 0.5f, (key_varying float)y + 0.5f);
                     Float2 pixel_center_NDC = screen_to_NDC(pixel_center.v[0], pixel_center.v[1], (key_varying int)image_width, (key_varying int)image_height);
 
-                    if(!point_inside_triangle(pixel_center_NDC, p0_NDC_2D, p1_NDC_2D, p2_NDC_2D)) 
+                    if(!point_inside_triangle_int(pixel_center, p0_screen, p1_screen, p2_screen)) 
                     {
                         continue;
                     }

@@ -139,7 +139,7 @@ void simple_triangle_test()
 
 		
 	image_convert_f32_to_byte((float*)image.data(), width, height, channels, png_out.data());
-	write_png("D:\\Source_repo\\test_tmp\\ispc_raster\\test_depth_test.png", width, height, channels, false, png_out.data());
+	write_png("D:\\Source_repo\\test_tmp\\ispc_raster\\test_depth_test_int_cross_5.png", width, height, channels, false, png_out.data());
 }
 
 int main()
