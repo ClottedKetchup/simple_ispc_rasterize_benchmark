@@ -43,7 +43,7 @@ foreach(ISPC_SOURCE_FILE ${ISPC_SOURCE})
     # COMMAND ${ISPC_EXECUTABLE} --target=${ISPC_ISA} --target-os=${ISPC_PLATFORM} --arch=${ISPC_TARGET_ARCH} ${ISPC_SOURCE_FILE} -g  -I "${PROJECT_SOURCE_DIR}/cpp_source/include" --header-outfile=${ISPC_HEADER_FILE} -o ${ISPC_OBJECT_FILE} -O0
     add_custom_command(
         OUTPUT ${ISPC_HEADER_FILE} ${ISPC_OBJECT_FILE}
-        COMMAND ${ISPC_EXECUTABLE} --target=${ISPC_ISA} --target-os=${ISPC_PLATFORM} --arch=${ISPC_TARGET_ARCH} ${ISPC_SOURCE_FILE} -g  -O0 -I "${PROJECT_SOURCE_DIR}/cpp_source/include" --header-outfile=${ISPC_HEADER_FILE} -o ${ISPC_OBJECT_FILE} 
+        COMMAND ${ISPC_EXECUTABLE} --target=${ISPC_ISA} --target-os=${ISPC_PLATFORM} --arch=${ISPC_TARGET_ARCH} ${ISPC_SOURCE_FILE}  -I "${PROJECT_SOURCE_DIR}/cpp_source/include" --header-outfile=${ISPC_HEADER_FILE} -o ${ISPC_OBJECT_FILE} 
         DEPENDS ${ISPC_SOURCE_FILE}
     )
 

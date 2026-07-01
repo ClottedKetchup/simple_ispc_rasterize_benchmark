@@ -1,6 +1,7 @@
 
 #include <iostream>
 #include <vector>
+#include <filesystem>
 
 #include "simple_test.h"
 #include "simple_math.h"
@@ -8,7 +9,7 @@
 
 #include "image_io.h"
 
-void simple_hello_world_test() 
+void simple_hello_world_test(const std::filesystem::path& exe_dir)
 {
 	const int width = 640;
 	const int height = 480;
@@ -22,10 +23,14 @@ void simple_hello_world_test()
 	ispc::ispc_test_image((ispc::Float3*)(image.data()), width, height, tile_width, tile_height);
 
 	image_convert_f32_to_byte((float*)image.data(), width, height, channels, png_out.data());
-	write_png("D:\\Source_repo\\test_tmp\\ispc_raster\\ispc_hello_world.png", width, height, channels, false, png_out.data());
+
+	std::filesystem::path file_name = "ispc_hello_world.png";
+	std::filesystem::path full_path = exe_dir / file_name;
+
+	write_png(full_path.generic_string().c_str(), width, height, channels, false, png_out.data());
 }
 
-void simple_triangle_test()
+void simple_triangle_test(const std::filesystem::path& exe_dir)
 {
 	const int width = 640;
 	const int height = 480;
@@ -137,13 +142,19 @@ void simple_triangle_test()
 		pixel_count,
 		(const ispc::Pixel*)pixel_buffer.data());
 
-		
 	image_convert_f32_to_byte((float*)image.data(), width, height, channels, png_out.data());
-	write_png("D:\\Source_repo\\test_tmp\\ispc_raster\\test_depth_test_int_cross_5.png", width, height, channels, false, png_out.data());
+
+	std::filesystem::path file_name = "ispc_triangle.png";
+	std::filesystem::path full_path = exe_dir / file_name;
+	write_png(full_path.generic_string().c_str(), width, height, channels, false, png_out.data());
 }
 
-int main()
+int main(int argc, char* argv[])
 {
-	simple_triangle_test();
+	std::filesystem::path exe_path = std::filesystem::absolute(argv[0]);
+	std::filesystem::path current_dir = exe_path.parent_path();
+
+	simple_hello_world_test(current_dir);
+	simple_triangle_test(current_dir);
 	return 0;
 }
