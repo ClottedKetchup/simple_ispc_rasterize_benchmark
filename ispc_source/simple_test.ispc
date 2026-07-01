@@ -77,19 +77,16 @@ task_get_pixel_count(const uniform int image_width,
         Float4 p2_homo = mvp * make_Float4(p2_world, 1.0f);
 
         // note: clip against near plane.
-        Float4 src_vertices[MAX_POLYGON_VERTICES];
-        Float4 dst_vertices[MAX_POLYGON_VERTICES];
+        Float4 src_vertices[MAX_CLIPPED_TRIANGLE_VERTICES];
+        Float4 dst_vertices[MAX_CLIPPED_TRIANGLE_VERTICES];
         
         src_vertices[0] = p0_homo;
         src_vertices[1] = p1_homo;
         src_vertices[2] = p2_homo;
 
-        const int src_count = 3;
         int dst_count = 0;
-
-        clip_triangle_near_plane(src_vertices, src_count, dst_vertices, &dst_count);
-        if(!(dst_count >= 3))
-        {
+        clip_triangle_near_plane(src_vertices, dst_vertices, &dst_count);
+        if(!(dst_count >= 3)) {
             continue;
         }
 
@@ -211,18 +208,16 @@ task_rasterize_triangle(const uniform int image_width,
         Float4 p2_homo = mvp * make_Float4(p2_world, 1.0f);
 
         // note: clip against near plane.
-        Float4 src_vertices[MAX_POLYGON_VERTICES];
-        Float4 dst_vertices[MAX_POLYGON_VERTICES];
+        Float4 src_vertices[MAX_CLIPPED_TRIANGLE_VERTICES];
+        Float4 dst_vertices[MAX_CLIPPED_TRIANGLE_VERTICES];
         
         src_vertices[0] = p0_homo;
         src_vertices[1] = p1_homo;
         src_vertices[2] = p2_homo;
 
-        const int src_count = 3;
         int dst_count = 0;
-        clip_triangle_near_plane(src_vertices, src_count, dst_vertices, &dst_count);
-        if(!(dst_count >= 3))
-        {
+        clip_triangle_near_plane(src_vertices, dst_vertices, &dst_count);
+        if(!(dst_count >= 3)) {
             continue;
         }
 

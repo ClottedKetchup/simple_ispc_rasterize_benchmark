@@ -1732,8 +1732,10 @@ static inline key_uniform bool point_inside_triangle_int(
 }
 #endif
 
-#define MAX_POLYGON_VERTICES 4
-static inline void clip_triangle_near_plane(key_varying const Float4 p_src[MAX_POLYGON_VERTICES],
+#define MAX_POLYGON_VERTICES 5
+#define MAX_CLIPPED_TRIANGLE_VERTICES 4
+
+static inline void clip_polygon_near_plane(key_varying const Float4 p_src[MAX_POLYGON_VERTICES],
 	key_varying const int count_src, 
 	key_varying Float4 p_dst[MAX_POLYGON_VERTICES], 
 	key_varying int count_dst[])
@@ -1764,8 +1766,41 @@ static inline void clip_triangle_near_plane(key_varying const Float4 p_src[MAX_P
 	}
 }
 
+
+static inline void clip_triangle_near_plane(key_varying const Float4 p_src[MAX_CLIPPED_TRIANGLE_VERTICES],
+	key_varying Float4 p_dst[MAX_CLIPPED_TRIANGLE_VERTICES],
+	key_varying int count_dst[])
+{
+	const key_varying float threshold = 1E-5f;
+
+	*count_dst = 0;
+	for (key_varying int p_index = 0; p_index < 3; ++p_index)
+	{
+		key_varying int p_next_index = p_index + 1;
+		if (p_next_index == 3) {
+			p_next_index = 0;
+		}
+
+		const key_varying Float4 p0 = p_src[p_index];
+		const key_varying Float4 p1 = p_src[p_next_index];
+
+		const key_varying bool p0_in_range = !(get_z(p0) < (threshold * get_w(p0)));
+		if (p0_in_range) {
+			p_dst[(*count_dst)++] = p_src[p_index];
+		}
+
+		const key_varying bool p1_in_range = !(get_z(p1) < (threshold * get_w(p1)));
+		if (p1_in_range != p0_in_range) {
+			key_varying float t = (get_z(p0) - threshold * get_w(p0)) / (threshold * (get_w(p1) - get_w(p0)) - (get_z(p1) - get_z(p0)));
+			key_varying Float4 p_intersect = p0 + t * (p1 - p0);
+			p_dst[(*count_dst)++] = p_intersect;
+		}
+	}
+}
+
+
 #if defined (ISPC) || defined(__ISPC__)
-static inline void clip_triangle_near_plane(const key_uniform Float4 p_src[MAX_POLYGON_VERTICES],
+static inline void clip_polygon_near_plane(const key_uniform Float4 p_src[MAX_POLYGON_VERTICES],
 	const key_uniform int count_src,
 	key_uniform Float4 p_dst[MAX_POLYGON_VERTICES],
 	key_uniform int count_dst[])
@@ -1791,6 +1826,37 @@ static inline void clip_triangle_near_plane(const key_uniform Float4 p_src[MAX_P
 		{
 			key_uniform float t = (get_z(p0) - threshold * get_w(p0)) /
 				(threshold * (get_w(p1) - get_w(p0)) - (get_z(p1) - get_z(p0)));
+			key_uniform Float4 p_intersect = p0 + t * (p1 - p0);
+			p_dst[(*count_dst)++] = p_intersect;
+		}
+	}
+}
+
+static inline void clip_triangle_near_plane(key_uniform const Float4 p_src[MAX_CLIPPED_TRIANGLE_VERTICES],
+	key_uniform Float4 p_dst[MAX_CLIPPED_TRIANGLE_VERTICES],
+	key_uniform int count_dst[])
+{
+	const key_uniform float threshold = 1E-5f;
+
+	*count_dst = 0;
+	for (key_uniform int p_index = 0; p_index < 3; ++p_index)
+	{
+		key_uniform int p_next_index = p_index + 1;
+		if (p_next_index == 3) {
+			p_next_index = 0;
+		}
+
+		const key_uniform Float4 p0 = p_src[p_index];
+		const key_uniform Float4 p1 = p_src[p_next_index];
+
+		const key_uniform bool p0_in_range = !(get_z(p0) < (threshold * get_w(p0)));
+		if (p0_in_range) {
+			p_dst[(*count_dst)++] = p_src[p_index];
+		}
+
+		const key_uniform bool p1_in_range = !(get_z(p1) < (threshold * get_w(p1)));
+		if (p1_in_range != p0_in_range) {
+			key_uniform float t = (get_z(p0) - threshold * get_w(p0)) / (threshold * (get_w(p1) - get_w(p0)) - (get_z(p1) - get_z(p0)));
 			key_uniform Float4 p_intersect = p0 + t * (p1 - p0);
 			p_dst[(*count_dst)++] = p_intersect;
 		}
