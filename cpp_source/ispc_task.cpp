@@ -17,6 +17,14 @@ using TaskFuncPtr = void (*)(void* data, int threadIndex, int threadCount,
                                             int taskIndex0, int taskIndex1, int taskIndex2,
                                             int taskCount0, int taskCount1, int taskCount2);
 
+template <typename T>
+void serial_for(size_t start, size_t end, T func) 
+{
+    for (size_t index = start; index < end; ++index) {
+        func(index);
+    }
+}
+
 static void* alloc_aligned_memory(int64_t size, int32_t alignment)
 {
     return _aligned_malloc(size, alignment);

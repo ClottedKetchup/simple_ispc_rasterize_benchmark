@@ -6,6 +6,7 @@
 #include <memory>
 #include <ppl.h>
 #include <cmath>
+#include <assert.h>
 
 #include "timer.h"
 
@@ -608,14 +609,166 @@ void simple_triangle_test(const std::filesystem::path& exe_dir)
 	write_png(full_path.generic_string().c_str(), width, height, channels, false, png_out.data());
 }
 
+void simple_tiled_shading_test(const std::filesystem::path& exe_dir)
+{
+	const int width = 1024;
+	const int height = 1024;
+	const int tile_width = 32;
+	const int tile_height = 32;
+	const int channels = 3;
+
+	const int tile_count_x = (width + tile_width - 1) / tile_width;
+	const int tile_count_y = (height + tile_height - 1) / tile_height;
+	const int total_tile_count = tile_count_x * tile_count_y;
+
+	// init test data and camera, transform matrix.
+	constexpr float triangle_z = 2.f;
+
+	std::vector<Float3> mesh_vertex_positions;
+	mesh_vertex_positions.push_back(make_Float3(-1.0f, 0.0f, triangle_z));
+	mesh_vertex_positions.push_back(make_Float3(1.0f, 0.0f, triangle_z));
+	mesh_vertex_positions.push_back(make_Float3(0.0f, 1.0f, triangle_z));
+
+	std::vector<Float3> mesh_vertex_colors;
+	mesh_vertex_colors.push_back(make_Float3(1.0f, 0.0f, 0.0f));
+	mesh_vertex_colors.push_back(make_Float3(1.0f, 0.0f, 0.0f));
+	mesh_vertex_colors.push_back(make_Float3(1.0f, 0.0f, 0.0f));
+
+	std::vector<Triangle> mesh_triangles;
+	mesh_triangles.push_back(Triangle{ 0, 1, 2 });
+
+	mesh_vertex_positions.push_back(make_Float3(0.5f, 0.0f, 2.5f));
+	mesh_vertex_positions.push_back(make_Float3(2.5f, 0.0f, 2.5f));
+	mesh_vertex_positions.push_back(make_Float3(0.5f, 2.0f, 2.5f));
+
+	mesh_vertex_colors.push_back(make_Float3(0.0f, 0.0f, 1.0f));
+	mesh_vertex_colors.push_back(make_Float3(0.0f, 0.0f, 1.0f));
+	mesh_vertex_colors.push_back(make_Float3(0.0f, 0.0f, 1.0f));
+
+	mesh_triangles.push_back(Triangle{ 3, 4, 5 });
+
+	Model test_model;
+	test_model.add_mesh(mesh_triangles, mesh_vertex_positions, mesh_vertex_colors);
+
+	Camera camera = camera_init_varying();
+	camera_look_at(camera, make_Float3(0.0f, 0.0f, triangle_z));
+
+	camera.aspect = float(width) / float(height);
+	camera.fov = 40.0f;
+	camera.near = 1.0f;
+	camera.far = 100.0f;
+
+	const Matrix4x4 model = matrix4x4_identity_varying();
+	const Matrix4x4 camera_to_world = get_camera_to_world_matrix(camera);
+	const Matrix4x4 world_to_camera = matrix4x4_inverse(camera_to_world);
+	const Matrix4x4 perspective = get_perspective_matrix(camera.fov, camera.aspect, camera.near, camera.far);
+
+	const Matrix4x4 world_to_NDC = perspective * (world_to_camera * model);
+
+	// step 1: calculate triangle count in each tile.
+	std::vector<unsigned int> tile_triangle_counts(total_tile_count, 0);
+	std::vector<TileIndexRange> triangle_tile_ranges(test_model.triangles.size(), {0, -1, 0, -1});
+	std::vector<BoundingBox2> triangle_screen_boundings(test_model.triangles.size(), make_bounding_box2_varying());
+
+	ispc::ispc_get_tile_triangle_count(width,
+		height,
+		tile_width,
+		tile_height,
+		tile_count_x,
+		tile_count_y,
+
+		test_model.triangles.size(),
+		(const ispc::Mesh*)test_model.meshes.data(),
+		(const ispc::Triangle*)test_model.triangles.data(),
+		(const ispc::Float3*)test_model.vertex_positions.data(),
+		(const ispc::Float3*)test_model.vertex_colors.data(),
+
+		(const ispc::Matrix4x4*)(&world_to_NDC),
+		tile_triangle_counts.data(),
+		(ispc::TileIndexRange*)triangle_tile_ranges.data(),
+		(ispc::BoundingBox2*)triangle_screen_boundings.data());
+
+	// step 2: detect triangle belong to which tile.
+	std::vector<uint32_t> tile_triangle_counters(total_tile_count, 0);
+	std::vector<unsigned int> tile_triangle_data_offsets(total_tile_count, 0);
+	
+	unsigned int total_tile_triangle_count = 0;
+	for (size_t tile_index = 0; tile_index < total_tile_count; ++tile_index) 
+	{
+		tile_triangle_data_offsets[tile_index] = total_tile_triangle_count;
+		total_tile_triangle_count += tile_triangle_counts[tile_index];
+	}
+
+	std::vector<unsigned int> tile_triangle_data(total_tile_triangle_count, EMPTY_INDEX_32);
+	
+	concurrency::parallel_for(0u, (uint32_t)test_model.triangles.size(), [&triangle_tile_ranges, &tile_triangle_data_offsets, &tile_triangle_counters, &tile_count_x, &tile_count_y, &tile_triangle_data, &tile_triangle_counts](uint32_t triangle_index)
+	{
+			const int tile_x_start = triangle_tile_ranges.at(triangle_index).tile_x_start;
+			const int tile_x_end = triangle_tile_ranges.at(triangle_index).tile_x_end;
+			const int tile_y_start = triangle_tile_ranges.at(triangle_index).tile_y_start;
+			const int tile_y_end = triangle_tile_ranges.at(triangle_index).tile_y_end;
+
+			for (int y = tile_y_start; y <= tile_y_end; ++y)
+			{
+				for (int x = tile_x_start; x <= tile_x_end; ++x)
+				{
+					int tile_index = y * tile_count_x + x;
+
+					uint32_t data_offset = tile_triangle_data_offsets.at(tile_index);
+					uint32_t tile_tri_index = std::atomic_fetch_add((std::atomic_uint32_t*)(&tile_triangle_counters[tile_index]), 1u);
+					assert(tile_tri_index < tile_triangle_counts.at(tile_index));
+
+					tile_triangle_data.at(data_offset + tile_tri_index) = triangle_index;
+				}
+			}
+	});
+	
+	// step 3: shade each tile.
+	std::vector<Float3> image(width * height, { 0 });
+	std::vector<float> depth_buffer(width * height, 1.0f);
+
+	std::vector<uint8_t> png_out(width * height * channels, { 0 });
+
+	ispc::ispc_simple_tile_shading(width,
+		height,
+		tile_width,
+		tile_height,
+		tile_count_x,
+		tile_count_y,
+
+		depth_buffer.data(),
+		(ispc::Float3*)image.data(),
+
+		test_model.triangles.size(),
+		(const ispc::Mesh*)test_model.meshes.data(),
+		(const ispc::Triangle*)test_model.triangles.data(),
+		(const ispc::Float3*)test_model.vertex_positions.data(),
+		(const ispc::Float3*)test_model.vertex_colors.data(),
+
+		(const ispc::Matrix4x4*)(&world_to_NDC),
+		tile_triangle_counts.data(),
+		tile_triangle_data_offsets.data(),
+		(ispc::BoundingBox2*) triangle_screen_boundings.data(),
+		tile_triangle_data.data());
+
+	image_convert_f32_to_byte((float*)image.data(), width, height, channels, png_out.data());
+
+	std::filesystem::path file_name = "ispc_tiled_triangle.png";
+	std::filesystem::path full_path = exe_dir / file_name;
+	write_png(full_path.generic_string().c_str(), width, height, channels, false, png_out.data());
+}
+
 int main(int argc, char* argv[])
 {
 	std::filesystem::path exe_path = std::filesystem::absolute(argv[0]);
 	std::filesystem::path current_dir = exe_path.parent_path();
 
-	cpp_hello_world_test(current_dir);
+	/*cpp_hello_world_test(current_dir);
 	simple_hello_world_test(current_dir);
 	cpp_triangle_test(current_dir);
-	simple_triangle_test(current_dir);
+	simple_triangle_test(current_dir);*/
+
+	simple_tiled_shading_test(current_dir);
 	return 0;
 }
+

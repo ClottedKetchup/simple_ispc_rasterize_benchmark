@@ -1360,6 +1360,16 @@ static inline key_varying BoundingBox2 make_bounding_box2_varying()
 	return box;
 }
 
+static inline key_varying BoundingBox2 bounding_box2_intersect(const key_varying BoundingBox2& box_a, const key_varying BoundingBox2& box_b)
+{
+	key_varying BoundingBox2 box;
+	box.x_min = box_a.x_min > box_b.x_min ? box_a.x_min : box_b.x_min;
+	box.x_max = box_a.x_max < box_b.x_max ? box_a.x_max : box_b.x_max;
+	box.y_min = box_a.y_min > box_b.y_min ? box_a.y_min : box_b.y_min;
+	box.y_max = box_a.y_max < box_b.y_max ? box_a.y_max : box_b.y_max;
+	return box;
+}
+
 static inline key_varying BoundingBox2 extend_bounding_box2(const key_varying BoundingBox2& box, const key_varying Float2& point)
 {
 	key_varying float point_x = get_x(point);
@@ -1381,6 +1391,16 @@ static inline key_uniform BoundingBox2 make_bounding_box2_uniform()
 	box.x_max = -SIMPLE_MATH_FMAX;
 	box.y_min = SIMPLE_MATH_FMAX;
 	box.y_max = -SIMPLE_MATH_FMAX;
+	return box;
+}
+
+static inline key_uniform BoundingBox2 bounding_box2_intersect(const key_uniform BoundingBox2& box_a, const key_uniform BoundingBox2& box_b)
+{
+	key_uniform BoundingBox2 box;
+	box.x_min = box_a.x_min > box_b.x_min ? box_a.x_min : box_b.x_min;
+	box.x_max = box_a.x_max < box_b.x_max ? box_a.x_max : box_b.x_max;
+	box.y_min = box_a.y_min > box_b.y_min ? box_a.y_min : box_b.y_min;
+	box.y_max = box_a.y_max < box_b.y_max ? box_a.y_max : box_b.y_max;
 	return box;
 }
 
@@ -1589,6 +1609,14 @@ struct Pixel
 	float b0_world;
 	float b1_world;
 	float b2_world;
+};
+
+struct TileIndexRange
+{
+	int tile_x_start;
+	int tile_x_end;
+	int tile_y_start;
+	int tile_y_end;
 };
 
 
